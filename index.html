@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#fff0f6">
+<meta name="description" content="糖果小蛇乐园：可爱卡通风格的手机贪吃蛇小游戏。">
+<title>🍓 糖果小蛇乐园</title>
+<style>
+:root{--pink:#e85d93;--pink-dark:#c83c77;--green:#6bcf91;--ink:#6d4560;--cream:#fff9fc;--panel:#fff;--shadow:0 10px 30px #d875a31c}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;min-height:100vh;background:radial-gradient(circle at 15% 8%,#ffe1ed 0,transparent 30%),radial-gradient(circle at 90% 30%,#e2f9df 0,transparent 32%),#fff8fb;color:var(--ink);font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;display:flex;justify-content:center;padding:18px 12px calc(20px + env(safe-area-inset-bottom))}
+main{width:min(100%,480px);display:flex;flex-direction:column;gap:14px}
+header{text-align:center;padding:8px 4px 0}
+h1{font-size:clamp(25px,7vw,34px);margin:0;color:var(--pink-dark);letter-spacing:1px}
+.subtitle{margin:7px 0 0;font-size:13px;color:#a36e8d}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.stat,.game-card,.controls-card,.help{background:#ffffffeb;border:1px solid #f8dce9;border-radius:20px;box-shadow:var(--shadow)}
+.stat{text-align:center;padding:12px 5px}
+.stat .label{font-size:12px;color:#a36e8d}
+.stat .value{font-weight:850;font-size:26px;color:var(--pink-dark);line-height:1.4}
+.game-card{padding:12px}
+.board-top{display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:750;margin:0 2px 10px}
+.pill{background:#e5f9e9;color:#368557;padding:5px 10px;border-radius:99px;font-size:12px}
+.pill.over{background:#ffe5ed;color:#bf386a}
+canvas{display:block;width:100%;height:auto;aspect-ratio:1;border-radius:13px;background:#e8f8e7;touch-action:none}
+.message{text-align:center;min-height:24px;font-size:14px;font-weight:650;padding:10px 3px 1px}
+.controls-card{padding:15px}
+.controls-title{text-align:center;font-weight:800;margin:0 0 4px}
+.controls-hint{text-align:center;color:#a36e8d;font-size:12px;margin:0 0 13px}
+.pad{display:grid;grid-template-columns:repeat(3,64px);grid-template-rows:repeat(2,56px);gap:8px;justify-content:center;align-items:center}
+button{font:inherit;cursor:pointer;border:0;touch-action:manipulation}
+.dir{height:56px;border-radius:17px;background:#ffe5f0;color:#c83c77;box-shadow:0 4px 0 #f5c4da;font-size:25px;font-weight:900;display:flex;align-items:center;justify-content:center;user-select:none}
+.dir:active{transform:translateY(3px);box-shadow:0 1px 0 #f5c4da}
+.up{grid-column:2;grid-row:1}.left{grid-column:1;grid-row:2}.down{grid-column:2;grid-row:2}.right{grid-column:3;grid-row:2}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}
+.action{border-radius:14px;padding:12px 8px;font-weight:800;background:#f6eaff;color:#8750a4}
+.action.primary{background:var(--pink);color:white;box-shadow:0 4px 0 #d94782}
+.action:active{transform:translateY(2px)}
+.help{padding:14px 16px;font-size:13px;line-height:1.8}
+.help strong{color:#c83c77}
+.help p{margin:3px 0}
+footer{text-align:center;color:#b58ba3;font-size:11px;padding-bottom:4px}
+@media(min-width:420px){.pad{grid-template-columns:70px 70px 70px;grid-template-rows:60px 60px}.dir{height:60px}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>🍓 糖果小蛇乐园 🍓</h1>
+    <p class="subtitle">SNAKE ADVENTURE · 吃掉苹果，快乐加倍！</p>
+  </header>
+  <section class="stats" aria-label="游戏数据">
+    <div class="stat"><div class="label">⭐ 当前分数</div><div class="value" id="score">0</div></div>
+    <div class="stat"><div class="label">🍎 苹果数量</div><div class="value" id="apples">0</div></div>
+    <div class="stat"><div class="label">🏆 最高分</div><div class="value" id="best">0</div></div>
+  </section>
+  <section class="game-card">
+    <div class="board-top"><span>🌿 草莓森林</span><span id="state" class="pill">准备开始</span></div>
+    <canvas id="board" width="400" height="400" aria-label="贪吃蛇游戏棋盘"></canvas>
+    <div class="message" id="message" aria-live="polite">点击「开始游戏」，用方向键控制小蛇 🐍</div>
+  </section>
+  <section class="controls-card">
+    <p class="controls-title">🕹️ 方向控制</p>
+    <p class="controls-hint">也可以在棋盘上滑动控制 · 电脑可用方向键</p>
+    <div class="pad">
+      <button class="dir up" data-dir="up" aria-label="向上">▲</button>
+      <button class="dir left" data-dir="left" aria-label="向左">◀</button>
+      <button class="dir down" data-dir="down" aria-label="向下">▼</button>
+      <button class="dir right" data-dir="right" aria-label="向右">▶</button>
+    </div>
+    <div class="actions">
+      <button class="action primary" id="start">▶ 开始游戏</button>
+      <button class="action" id="restart">🔄 重新开始</button>
+    </div>
+  </section>
+  <section class="help">
+    <p><strong>🍎 收集苹果：</strong>每吃一个苹果获得 10 分，小蛇会变长。</p>
+    <p><strong>🚧 注意安全：</strong>撞到墙壁或自己的身体，游戏就会结束。</p>
+    <p><strong>🎮 操作方法：</strong>按方向键、键盘方向键，或在棋盘上滑动。</p>
+  </section>
+  <footer>祝你玩得开心 💗 · 游戏进度保存在当前设备</footer>
+</main>
+<script>
+(()=>{
+'use strict';
+const canvas=document.getElementById('board'),ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('score'),applesEl=document.getElementById('apples'),bestEl=document.getElementById('best');
+const stateEl=document.getElementById('state'),messageEl=document.getElementById('message'),startBtn=document.getElementById('start');
+const N=20,S=20;
+let snake,food,dir,nextDir,score,apples,best,running,ended,timer,lastTick=0;
+try{best=Number(localStorage.getItem('sugarSnakeBest')||0)}catch(e){best=0}
+bestEl.textContent=best;
+function reset(){
+  clearInterval(timer);snake=[{x:7,y:10},{x:6,y:10},{x:5,y:10}];dir={x:1,y:0};nextDir={x:1,y:0};
+  score=0;apples=0;running=false;ended=false;food=makeFood();updateStats();
+  stateEl.textContent='准备开始';stateEl.className='pill';messageEl.textContent='点击「开始游戏」，用方向键控制小蛇 🐍';startBtn.textContent='▶ 开始游戏';draw();
+}
+function makeFood(){
+ const free=[];for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(!snake.some(p=>p.x===x&&p.y===y))free.push({x,y});
+ return free.length?free[Math.floor(Math.random()*free.length)]:null;
+}
+function updateStats(){scoreEl.textContent=score;applesEl.textContent=apples;bestEl.textContent=best}
+function start(){
+ if(running)return;
+ if(ended)reset();
+ running=true;ended=false;stateEl.textContent='冒险中';stateEl.className='pill';messageEl.textContent='出发！去寻找红苹果吧 🍎';startBtn.textContent='⏸ 暂停游戏';
+ clearInterval(timer);timer=setInterval(tick,135);
+}
+function pause(){
+ if(!running)return;running=false;clearInterval(timer);stateEl.textContent='已暂停';messageEl.textContent='休息一下！点击「继续游戏」接着玩。';startBtn.textContent='▶ 继续游戏';draw();
+}
+function finish(won=false){
+ running=false;ended=true;clearInterval(timer);stateEl.textContent=won?'通关啦':'游戏结束';stateEl.className='pill over';
+ messageEl.textContent=won?'太厉害啦！你填满了整个森林！🏆':'哎呀，撞到啦！点击重新开始，再挑战一次吧 💗';
+ startBtn.textContent='▶ 再玩一次';draw();
+}
+function setDirection(name){
+ const map={up:{x:0,y:-1},down:{x:0,y:1},left:{x:-1,y:0},right:{x:1,y:0}},d=map[name];if(!d)return;
+ if(d.x===-dir.x&&d.y===-dir.y)return;
+ nextDir=d;
+ if(!running&&!ended){messageEl.textContent='方向已准备好，点击「开始游戏」出发！';}
+}
+function tick(){
+ dir=nextDir;
+ const h=snake[0],n={x:h.x+dir.x,y:h.y+dir.y},eat=food&&n.x===food.x&&n.y===food.y;
+ if(n.x<0||n.x>=N||n.y<0||n.y>=N||snake.slice(0,eat?snake.length:snake.length-1).some(p=>p.x===n.x&&p.y===n.y)){finish();return}
+ snake.unshift(n);if(eat){score+=10;apples++;if(score>best){best=score;try{localStorage.setItem('sugarSnakeBest',String(best))}catch(e){}}
+ updateStats();food=makeFood();messageEl.textContent='好吃！获得 10 分，继续加油！🍎';if(!food){finish(true);return}
+ }else snake.pop();
+ draw();
+}
+function roundedRect(x,y,w,h,r,color){ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill()}
+function draw(){
+ const size=canvas.width/N;ctx.clearRect(0,0,canvas.width,canvas.height);
+ for(let y=0;y<N;y++)for(let x=0;x<N;x++){roundedRect(x*size+1,y*size+1,size-2,size-2,3,(x+y)%2?'#dff3dc':'#e8f8e7')}
+ if(food){const cx=(food.x+.5)*size,cy=(food.y+.52)*size;ctx.fillStyle='#f45c80';ctx.beginPath();ctx.arc(cx,cy,size*.31,0,Math.PI*2);ctx.fill();ctx.fillStyle='#a9df78';ctx.beginPath();ctx.ellipse(cx+3,cy-size*.32,4,2,-.5,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#5aab65';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(cx,cy-size*.22);ctx.lineTo(cx+1,cy-size*.43);ctx.stroke();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(cx-size*.1,cy-size*.08,2,0,Math.PI*2);ctx.fill()}
+ snake.forEach((p,i)=>{const pad=2,x=p.x*size+pad,y=p.y*size+pad,w=size-pad*2;roundedRect(x,y,w,w,i===0?7:6,i===0?'#29ad6a':'#70d69a');if(i===0){let ex1=x+w*.34,ey1=y+w*.35,ex2=x+w*.68,ey2=y+w*.35;if(dir.x===1){ex1=x+w*.64;ex2=x+w*.64;ey1=y+w*.32;ey2=y+w*.68}else if(dir.x===-1){ex1=x+w*.36;ex2=x+w*.36;ey1=y+w*.32;ey2=y+w*.68}else if(dir.y===1){ey1=y+w*.63;ey2=y+w*.63;ex1=x+w*.32;ex2=x+w*.68}else{ey1=y+w*.37;ey2=y+w*.37;ex1=x+w*.32;ex2=x+w*.68}
+ ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(ex1,ey1,2.8,0,Math.PI*2);ctx.arc(ex2,ey2,2.8,0,Math.PI*2);ctx.fill();ctx.fillStyle='#3b5b48';ctx.beginPath();ctx.arc(ex1,ey1,1.3,0,Math.PI*2);ctx.arc(ex2,ey2,1.3,0,Math.PI*2);ctx.fill()}})
+}
+document.querySelectorAll('[data-dir]').forEach(b=>b.addEventListener('click',()=>setDirection(b.dataset.dir)));
+startBtn.addEventListener('click',()=>{if(running)pause();else start()});
+document.getElementById('restart').addEventListener('click',()=>{reset();start()});
+window.addEventListener('keydown',e=>{const map={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',w:'up',s:'down',a:'left',d:'right'};if(map[e.key]){e.preventDefault();setDirection(map[e.key])}if(e.key===' '){e.preventDefault();running?pause():start()}});
+let touchStart=null;
+canvas.addEventListener('touchstart',e=>{const t=e.changedTouches[0];touchStart={x:t.clientX,y:t.clientY}},{passive:true});
+canvas.addEventListener('touchend',e=>{if(!touchStart)return;const t=e.changedTouches[0],dx=t.clientX-touchStart.x,dy=t.clientY-touchStart.y;touchStart=null;if(Math.max(Math.abs(dx),Math.abs(dy))<18)return;setDirection(Math.abs(dx)>Math.abs(dy)?(dx>0?'right':'left'):(dy>0?'down':'up'));if(!running&&!ended)start()},{passive:true});
+reset();
+})();
+</script>
+</body>
+</html>
