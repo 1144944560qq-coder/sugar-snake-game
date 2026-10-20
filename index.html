@@ -42,6 +42,20 @@ button{font:inherit;cursor:pointer;border:0;touch-action:manipulation}
 .help p{margin:3px 0}
 footer{text-align:center;color:#b58ba3;font-size:11px;padding-bottom:4px}
 @media(min-width:420px){.pad{grid-template-columns:70px 70px 70px;grid-template-rows:60px 60px}.dir{height:60px}}
+
+.leaderboard-card,.challenge-card{background:#ffffffeb;border:1px solid #f8dce9;border-radius:20px;box-shadow:var(--shadow);padding:15px}
+.section-title{margin:0 0 10px;font-weight:850;color:var(--pink-dark)}
+.name-row{display:flex;gap:8px;align-items:center}
+.name-input{min-width:0;flex:1;border:1px solid #f0cadd;border-radius:12px;padding:11px;font:inherit;color:var(--ink);background:#fff}
+.small-btn{border-radius:12px;padding:11px 12px;font-weight:800;background:#f6eaff;color:#8750a4}
+.leader-list{margin:0;padding:0;list-style:none;display:grid;gap:7px}
+.leader-item{display:grid;grid-template-columns:32px 1fr auto;gap:8px;align-items:center;background:#fff5fa;border-radius:12px;padding:9px 10px;font-size:13px}
+.rank-medal{font-size:18px;text-align:center}
+.leader-score{font-weight:850;color:var(--pink-dark)}
+.empty-rank{font-size:13px;color:#a36e8d;padding:8px 0}
+.challenge-banner{background:#fff0f6;border:1px dashed #e88ab0;border-radius:14px;padding:12px;font-size:13px;line-height:1.65;margin-bottom:10px}
+.challenge-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:350px){.challenge-actions{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -74,12 +88,33 @@ footer{text-align:center;color:#b58ba3;font-size:11px;padding-bottom:4px}
       <button class="action" id="restart">🔄 重新开始</button>
     </div>
   </section>
+
+  <section class="challenge-card" id="challengeCard" hidden>
+    <h2 class="section-title">💌 好友挑战</h2>
+    <div class="challenge-banner" id="challengeText">好友向你发起挑战！</div>
+    <p class="controls-hint">目标分数越高越有挑战性，超过目标就赢啦！</p>
+  </section>
+  <section class="leaderboard-card">
+    <h2 class="section-title">🏆 本机排行榜</h2>
+    <p class="controls-hint" style="text-align:left;margin-bottom:10px">只保存在当前设备；好友的成绩不会自动同步。</p>
+    <div class="name-row" style="margin-bottom:12px">
+      <input class="name-input" id="playerName" maxlength="12" placeholder="输入你的昵称（最多12字）" aria-label="玩家昵称">
+      <button class="small-btn" id="saveName">保存昵称</button>
+    </div>
+    <ol class="leader-list" id="leaderList"></ol>
+    <div class="empty-rank" id="rankEmpty">还没有成绩，开始第一局吧！</div>
+    <div class="challenge-actions" style="margin-top:12px">
+      <button class="small-btn" id="shareChallenge">💌 分享我的挑战</button>
+      <button class="small-btn" id="copyGameLink">🔗 复制游戏链接</button>
+    </div>
+    <div class="message" id="shareStatus" aria-live="polite"></div>
+  </section>
   <section class="help">
     <p><strong>🍎 收集苹果：</strong>每吃一个苹果获得 10 分，小蛇会变长。</p>
     <p><strong>🚧 注意安全：</strong>撞到墙壁或自己的身体，游戏就会结束。</p>
     <p><strong>🎮 操作方法：</strong>按方向键、键盘方向键，或在棋盘上滑动。</p>
   </section>
-  <footer>祝你玩得开心 💗 · 游戏进度保存在当前设备</footer>
+  <footer>祝你玩得开心 💗 · 成绩和昵称保存在当前设备 · 挑战链接可分享给好友</footer>
 </main>
 <script>
 (()=>{
@@ -90,7 +125,78 @@ const stateEl=document.getElementById('state'),messageEl=document.getElementById
 const N=20,S=20;
 let snake,food,dir,nextDir,score,apples,best,running,ended,timer,lastTick=0;
 try{best=Number(localStorage.getItem('sugarSnakeBest')||0)}catch(e){best=0}
+
 bestEl.textContent=best;
+const nameInput=document.getElementById('playerName');
+const leaderList=document.getElementById('leaderList');
+const rankEmpty=document.getElementById('rankEmpty');
+const shareStatus=document.getElementById('shareStatus');
+const challengeCard=document.getElementById('challengeCard');
+const challengeText=document.getElementById('challengeText');
+const query=new URLSearchParams(location.search);
+const challengeTarget=Math.max(0,Number(query.get('target')||0));
+const challengeFrom=(query.get('from')||'好友').slice(0,24);
+let playerName='小蛇玩家';
+try{playerName=localStorage.getItem('sugarSnakeName')||'小蛇玩家'}catch(e){}
+nameInput.value=playerName;
+if(challengeTarget>0){
+ challengeCard.hidden=false;
+ challengeText.textContent=`🎯 ${challengeFrom}向你发起挑战！请努力拿到 ${challengeTarget} 分或更高分，打败对方！`;
+}
+function safeReadScores(){
+ try{const v=JSON.parse(localStorage.getItem('sugarSnakeScores')||'[]');return Array.isArray(v)?v:[]}catch(e){return []}
+}
+function renderLeaderboard(){
+ const scores=safeReadScores().sort((a,b)=>b.score-a.score||b.time-a.time).slice(0,10);
+ leaderList.innerHTML='';
+ rankEmpty.hidden=scores.length>0;
+ scores.forEach((item,i)=>{
+  const li=document.createElement('li');li.className='leader-item';
+  const medal=document.createElement('span');medal.className='rank-medal';medal.textContent=['🥇','🥈','🥉'][i]||String(i+1);
+  const who=document.createElement('span');who.textContent=item.name||'小蛇玩家';
+  const val=document.createElement('span');val.className='leader-score';val.textContent=String(item.score)+' 分';
+  li.append(medal,who,val);leaderList.appendChild(li);
+ });
+}
+function rememberScore(value){
+ if(value<=0)return;
+ const scores=safeReadScores();
+ scores.push({name:playerName,score:value,time:Date.now()});
+ scores.sort((a,b)=>b.score-a.score||b.time-a.time);
+ try{localStorage.setItem('sugarSnakeScores',JSON.stringify(scores.slice(0,30)))}catch(e){}
+ renderLeaderboard();
+}
+function getBaseUrl(){return location.origin+location.pathname}
+function makeChallengeUrl(){
+ const u=new URL(getBaseUrl());
+ u.searchParams.set('target',String(Math.max(10,score||best||10)));
+ u.searchParams.set('from',playerName);
+ return u.toString();
+}
+async function copyText(text){
+ if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(text);return true}
+ const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();
+ let ok=false;try{ok=document.execCommand('copy')}catch(e){}ta.remove();return ok;
+}
+document.getElementById('saveName').addEventListener('click',()=>{
+ playerName=(nameInput.value.trim()||'小蛇玩家').slice(0,12);nameInput.value=playerName;
+ try{localStorage.setItem('sugarSnakeName',playerName)}catch(e){}
+ shareStatus.textContent='昵称已保存！下次成绩会使用这个昵称。';
+});
+document.getElementById('shareChallenge').addEventListener('click',async()=>{
+ const url=makeChallengeUrl();
+ const text=`🐍 我在糖果小蛇乐园挑战你！目标是 ${Math.max(10,score||best||10)} 分，快来超过我：${url}`;
+ try{
+  if(navigator.share){await navigator.share({title:'糖果小蛇好友挑战',text,url});shareStatus.textContent='分享面板已打开，选择微信好友即可。';}
+  else{const ok=await copyText(text);shareStatus.textContent=ok?'挑战文案已复制，去微信聊天框粘贴发送吧！':'复制失败，请长按下面的链接复制：'+url; if(!ok)window.prompt('复制挑战链接并发给好友：',url);}
+ }catch(e){if(e.name!=='AbortError'){shareStatus.textContent='请复制挑战链接发给好友：'+url;window.prompt('复制挑战链接并发给好友：',url)}}
+});
+document.getElementById('copyGameLink').addEventListener('click',async()=>{
+ const url=getBaseUrl();const ok=await copyText(url);
+ shareStatus.textContent=ok?'游戏链接已复制，可以粘贴到微信聊天框！':'请长按复制此链接：'+url;
+ if(!ok)window.prompt('复制游戏链接：',url);
+});
+renderLeaderboard();
 function reset(){
   clearInterval(timer);snake=[{x:7,y:10},{x:6,y:10},{x:5,y:10}];dir={x:1,y:0};nextDir={x:1,y:0};
   score=0;apples=0;running=false;ended=false;food=makeFood();updateStats();
@@ -113,7 +219,12 @@ function pause(){
 function finish(won=false){
  running=false;ended=true;clearInterval(timer);stateEl.textContent=won?'通关啦':'游戏结束';stateEl.className='pill over';
  messageEl.textContent=won?'太厉害啦！你填满了整个森林！🏆':'哎呀，撞到啦！点击重新开始，再挑战一次吧 💗';
- startBtn.textContent='▶ 再玩一次';draw();
+ startBtn.textContent='▶ 再玩一次';
+ rememberScore(score);
+ if(challengeTarget>0){
+   messageEl.textContent += score>=challengeTarget?' 🎉 挑战成功！你超过目标啦！':' 🎯 还差 '+(challengeTarget-score)+' 分就能完成好友挑战！';
+ }
+ draw();
 }
 function setDirection(name){
  const map={up:{x:0,y:-1},down:{x:0,y:1},left:{x:-1,y:0},right:{x:1,y:0}},d=map[name];if(!d)return;
